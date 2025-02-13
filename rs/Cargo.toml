@@ -1,0 +1,8 @@
+[package]
+name = "typewriter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serialport = "4.6.1"
+time = "0.3.37"
