@@ -1,5 +1,5 @@
 /target
-/c/target
+/c/build
 .vscode
 
 .DS_Store

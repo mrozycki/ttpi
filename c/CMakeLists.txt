@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 set(PICO_BOARD pico_w)
-include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
+include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
 # if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/credentials.cmake)
 #     # copy it over from cmake/credentials.cmake.example
@@ -26,12 +26,9 @@ add_compile_options(
 pico_sdk_init()
 
 
-message("DUPA")
-message(${PICO_TINYUSB_PATH})
 set(FAMILY rp2040)
 set(BOARD pico_sdk)
 set(TINYUSB_FAMILY_PROJECT_NAME_PREFIX "tinyusb_host_")
 # Hack as some host examples use $TOP in their path
 set(TOP ${PICO_TINYUSB_PATH})
-# add_subdirectory(${PICO_TINYUSB_PATH}/examples/host tinyusb_host_examples)
 add_subdirectory(src)

@@ -10,6 +10,7 @@
     flake-utils.lib.eachDefaultSystem (system: 
       let 
         pkgs = nixpkgs.legacyPackages.${system}; 
+        pico-sdk-with-sm = (pkgs.pico-sdk.override { withSubmodules = true; });
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
@@ -18,12 +19,13 @@
             gnumake
             git
             openocd
-            pico-sdk
+            pico-sdk-with-sm
+            picotool
           ];
           
           shellHook = ''
             # ...
-            export PICO_SDK_PATH="${pkgs.pico-sdk}/lib/pico-sdk/"
+            export PICO_SDK_PATH="${pico-sdk-with-sm}/lib/pico-sdk/"
             export CMAKE_PREFIX_PATH=$NIXPKGS_CMAKE_PREFIX_PATH
           '';
         };
