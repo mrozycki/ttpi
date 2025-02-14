@@ -30,6 +30,8 @@
 #include "bsp/board_api.h"
 #include "tusb.h"
 
+#include <pico/stdio.h>
+
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
 //--------------------------------------------------------------------+
@@ -46,7 +48,8 @@ extern bool tuh_max3421_reg_write(uint8_t rhport, uint8_t reg, uint8_t data, boo
 /*------------- MAIN -------------*/
 int main(void) {
   board_init();
-
+  stdio_init_all();
+  
   printf("TinyUSB Host CDC MSC HID Example\r\n");
 
   // init host stack on configured roothub port
