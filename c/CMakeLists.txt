@@ -22,13 +22,19 @@ add_compile_options(
         )
 
 
-# initialize the Raspberry Pi Pico SDK
-pico_sdk_init()
-
-
 set(FAMILY rp2040)
 set(BOARD pico_sdk)
 set(TINYUSB_FAMILY_PROJECT_NAME_PREFIX "tinyusb_host_")
 # Hack as some host examples use $TOP in their path
 set(TOP ${PICO_TINYUSB_PATH})
+
+# initialize the Raspberry Pi Pico SDK
+pico_sdk_init()
+
+include(ExternalProject)
+FetchContent_Declare(pico_pio_usb
+  GIT_REPOSITORY    https://github.com/sekigon-gonnoc/Pico-PIO-USB.git
+  GIT_TAG           0.6.1
+)
+FetchContent_MakeAvailable(pico_pio_usb)
 add_subdirectory(src)

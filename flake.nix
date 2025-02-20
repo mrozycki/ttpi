@@ -21,6 +21,7 @@
             openocd
             pico-sdk-with-sm
             picotool
+            probe-rs-tools
           ];
           
           shellHook = ''
