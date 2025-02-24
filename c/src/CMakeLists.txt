@@ -1,12 +1,7 @@
 set(PROGRAM_NAME pico_typewriter)
 
 add_executable(${PROGRAM_NAME}
-        # main.c
-        # cdc_app.c
-        # hid_app.c
-        # msc_app.c
-        host_hid_to_device_cdc.c
-        #  usb_descriptors.c
+        main.c
          # can use 'tinyusb_pico_pio_usb' library later when pico-sdk is updated
          ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/dcd_pio_usb.c
          ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c

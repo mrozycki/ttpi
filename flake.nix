@@ -18,6 +18,7 @@
             cmake
             gnumake
             git
+            ninja
             openocd
             pico-sdk-with-sm
             picotool
