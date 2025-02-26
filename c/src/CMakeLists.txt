@@ -17,7 +17,7 @@ target_include_directories(${PROGRAM_NAME} PUBLIC
 
 target_link_libraries(${PROGRAM_NAME}
         pico_stdlib
-        hardware_adc
+        hardware_uart
 
         pico_pio_usb
         # tinyusb_device
@@ -25,7 +25,7 @@ target_link_libraries(${PROGRAM_NAME}
         tinyusb_board)
 
 # pico_enable_stdio_usb(${PROGRAM_NAME} TRUE)
-# pico_enable_stdio_uart(${PROGRAM_NAME} TRUE)
+pico_enable_stdio_uart(${PROGRAM_NAME} FALSE)
 pico_enable_stdio_rtt(${PROGRAM_NAME} TRUE)
 
 pico_add_extra_outputs(${PROGRAM_NAME})

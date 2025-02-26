@@ -42,8 +42,17 @@
 
 #include "pio_usb.h"
 #include "tusb.h"
+#include "keymap.h"
 
-static uint8_t const keycode2ascii[128][2] = {HID_KEYCODE_TO_ASCII};
+#define UART_ID uart0
+#define BAUD_RATE 1200
+#define DATA_BITS 8
+#define STOP_BITS 1
+#define PARITY    UART_PARITY_NONE
+
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
+#define UART_CTS_PIN 2
 
 /*------------- MAIN -------------*/
 
@@ -62,6 +71,15 @@ int main(void)
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
   pio_cfg.pin_dp = 16;
   tuh_configure(1, TUH_CFGID_RPI_PIO_USB_CONFIGURATION, &pio_cfg);
+
+  uart_init(UART_ID, BAUD_RATE);
+  gpio_set_function(UART_TX_PIN, UART_FUNCSEL_NUM(UART_ID, UART_TX_PIN));
+  gpio_set_function(UART_RX_PIN, UART_FUNCSEL_NUM(UART_ID, UART_RX_PIN));
+  gpio_set_function(UART_CTS_PIN, GPIO_FUNC_UART);
+  uart_set_baudrate(UART_ID, BAUD_RATE);
+  uart_set_hw_flow(UART_ID, true, false);
+  uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
+  uart_set_fifo_enabled(UART_ID, false);
 
   // To run USB SOF interrupt in core1, init host stack for pio_usb (roothub
   // port1) on core1
@@ -148,11 +166,20 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         // not existed in previous report means the current key is pressed
         bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
         bool const is_alt = report->modifier & KEYBOARD_MODIFIER_RIGHTALT;
-        uint8_t ch = keycode2ascii[keycode][is_shift ? 1 : 0];
+        uint8_t const iso = keycode2iso[keycode][is_shift + 2 * is_alt];
 
-        if (ch)
+        if (iso)
         {
-          printf("%c, alt=%d", ch, is_alt);
+          printf("%c\n", iso);
+          uint8_t const table_size = sizeof(iso2erika[iso]) / sizeof(iso2erika[iso][0]);
+          for (uint8_t i = 0; i < table_size; ++i) {
+            uint8_t const ch = iso2erika[iso][i];
+            if (ch == 0)
+              break;
+            printf("print me pls %d", ch);
+            uart_putc(UART_ID, ch);
+          }
+          
           flush = true;
         }
       }
