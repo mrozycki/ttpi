@@ -48,7 +48,7 @@
 #define BAUD_RATE 1200
 #define DATA_BITS 8
 #define STOP_BITS 1
-#define PARITY    UART_PARITY_NONE
+#define PARITY UART_PARITY_NONE
 
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
@@ -150,6 +150,7 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
 {
   (void)dev_addr;
   static hid_keyboard_report_t prev_report = {0, 0, {0}}; // previous report to check key released
+  static bool caps_lock = false;
   bool flush = false;
 
   for (uint8_t i = 0; i < 6; i++)
@@ -161,10 +162,15 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
       {
         // exist in previous report means the current key is holding
       }
+      else if (keycode == KC_CAPS_LOCK)
+      {
+        caps_lock = !caps_lock;
+      }
       else
       {
         // not existed in previous report means the current key is pressed
-        bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
+        bool const is_alpha = keycode >= KC_A && keycode <= KC_Z;
+        bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT) || (is_alpha && caps_lock);
         bool const is_alt = report->modifier & KEYBOARD_MODIFIER_RIGHTALT;
         uint8_t const iso = keycode2iso[keycode][is_shift + 2 * is_alt];
 
@@ -172,15 +178,24 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         {
           printf("%c\n", iso);
           uint8_t const table_size = sizeof(iso2erika[iso]) / sizeof(iso2erika[iso][0]);
-          for (uint8_t i = 0; i < table_size; ++i) {
+          for (uint8_t i = 0; i < table_size; ++i)
+          {
             uint8_t const ch = iso2erika[iso][i];
             if (ch == 0)
               break;
             printf("print me pls %d", ch);
             uart_putc(UART_ID, ch);
           }
-          
+
           flush = true;
+          continue;
+        }
+
+        uint8_t const special_key = special_keycode2erika[keycode];
+        if (special_key)
+        {
+          printf("special key: %c\n", special_key);
+          uart_putc(UART_ID, special_key);
         }
       }
     }
