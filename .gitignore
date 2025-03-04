@@ -1,5 +1,7 @@
-/target
-/c/build
+target
+build
+.cache
+
 .vscode
 
 .DS_Store
