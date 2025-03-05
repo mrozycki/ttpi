@@ -54,7 +54,26 @@
 #define UART_RX_PIN 1
 #define UART_CTS_PIN 2
 
+static uint8_t leds = 0;
+static uint8_t prev_leds = 0xFF;
+
+static uint8_t keybd_dev_addr = 0xFF;
+static uint8_t keybd_instance;
+
 /*------------- MAIN -------------*/
+
+void hid_app_task(void)
+{
+  // update keyboard leds
+  if (keybd_dev_addr != 0xFF)
+  { // only if keyboard attached
+    if (leds != prev_leds)
+    {
+      tuh_hid_set_report(keybd_dev_addr, keybd_instance, 0, HID_REPORT_TYPE_OUTPUT, &leds, sizeof(leds));
+      prev_leds = leds;
+    }
+  }
+}
 
 int main(void)
 {
@@ -88,6 +107,7 @@ int main(void)
   while (true)
   {
     tuh_task(); // tinyusb host task
+    hid_app_task();
   }
 
   return 0;
@@ -120,6 +140,12 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
   // tuh_hid_report_received_cb() will be invoked when report is available
   if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD || itf_protocol == HID_ITF_PROTOCOL_MOUSE)
   {
+    if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
+      keybd_dev_addr = dev_addr;
+      keybd_instance = instance;
+      tuh_hid_set_report(keybd_dev_addr, keybd_instance, 0, HID_REPORT_TYPE_OUTPUT, &leds, sizeof(leds));
+      prev_leds = leds;
+    }
     if (!tuh_hid_receive_report(dev_addr, instance))
     {
       printf("Error: cannot request report\r\n");
@@ -131,6 +157,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
   printf("[%u] HID Interface%u is unmounted\r\n", dev_addr, instance);
+  keybd_dev_addr = 0xFF;
 }
 
 // look up new key in previous keys
@@ -145,12 +172,39 @@ static inline bool find_key_in_report(hid_keyboard_report_t const *report, uint8
   return false;
 }
 
+static void print_char_to_typewriter(uint8_t iso_code, bool correcting) {
+  static bool previous_correcting = false;
+
+  if (correcting && !previous_correcting) {
+    uart_putc(UART_ID, TW_CORRECTING);
+    uart_putc(UART_ID, TW_BACKWARDS);
+    previous_correcting = correcting;
+  } else if (!correcting && previous_correcting) {
+    uart_putc(UART_ID, TW_WRITING);
+    uart_putc(UART_ID, TW_FORWARDS);
+    previous_correcting = correcting;
+  }
+  printf("%c\n", iso_code);
+
+  uint8_t const table_size = sizeof(iso2erika[iso_code]) / sizeof(iso2erika[iso_code][0]);
+  for (uint8_t i = 0; i < table_size; ++i) {
+    uint8_t const ch = iso2erika[iso_code][table_size - i - 1];
+    if (ch == 0)
+      continue;
+    printf("%s me pls %d", (correcting ? "remove" : "print"), ch);
+    uart_putc(UART_ID, ch);
+  }
+}
+
+
 // convert hid keycode to ascii and print via usb device CDC (ignore non-printable)
 static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *report)
 {
   (void)dev_addr;
   static hid_keyboard_report_t prev_report = {0, 0, {0}}; // previous report to check key released
   static bool caps_lock = false;
+  static uint8_t line_buffer[150];
+  static uint8_t line_position = 0;
   bool flush = false;
 
   for (uint8_t i = 0; i < 6; i++)
@@ -165,6 +219,13 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
       else if (keycode == KC_CAPS_LOCK)
       {
         caps_lock = !caps_lock;
+        leds ^= KEYBOARD_LED_CAPSLOCK;
+      }
+      else if (keycode == KC_BACKSPACE && line_position > 0)
+      {
+        uint8_t iso = line_buffer[--line_position];
+        print_char_to_typewriter(iso, true);
+        flush = true;
       }
       else
       {
@@ -173,21 +234,18 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT) || (is_alpha && caps_lock);
         bool const is_alt = report->modifier & KEYBOARD_MODIFIER_RIGHTALT;
         uint8_t const iso = keycode2iso[keycode][is_shift + 2 * is_alt];
-
+        
         if (iso)
         {
-          printf("%c\n", iso);
-          uint8_t const table_size = sizeof(iso2erika[iso]) / sizeof(iso2erika[iso][0]);
-          for (uint8_t i = 0; i < table_size; ++i)
-          {
-            uint8_t const ch = iso2erika[iso][i];
-            if (ch == 0)
-              break;
-            printf("print me pls %d", ch);
-            uart_putc(UART_ID, ch);
-          }
+          line_buffer[line_position++] = iso;
+          print_char_to_typewriter(iso, false);
 
           flush = true;
+
+          if (iso == '\n') {
+            line_position = 0;
+          }
+
           continue;
         }
 
