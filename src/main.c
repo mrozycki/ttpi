@@ -54,7 +54,7 @@
 #define UART_RX_PIN 1
 #define UART_CTS_PIN 2
 
-static uint8_t leds = 0;
+static uint8_t leds = KEYBOARD_LED_NUMLOCK;
 static uint8_t prev_leds = 0xFF;
 
 static uint8_t keybd_dev_addr = 0xFF;
@@ -99,6 +99,9 @@ int main(void)
   uart_set_hw_flow(UART_ID, true, false);
   uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
   uart_set_fifo_enabled(UART_ID, false);
+
+  uart_putc(UART_ID, TW_WRITING);
+  uart_putc(UART_ID, TW_FORWARDS);
 
   // To run USB SOF interrupt in core1, init host stack for pio_usb (roothub
   // port1) on core1
@@ -172,18 +175,28 @@ static inline bool find_key_in_report(hid_keyboard_report_t const *report, uint8
   return false;
 }
 
-static void print_char_to_typewriter(uint8_t iso_code, bool correcting) {
-  static bool previous_correcting = false;
+typedef enum {
+  WRITING,
+  CORRECTING  
+} direction;
 
-  if (correcting && !previous_correcting) {
+static void set_direction(direction new_direction) {
+  static direction previous_direction = false;
+
+  if (new_direction == CORRECTING && previous_direction == WRITING) {
+    printf("now correcting\n");
     uart_putc(UART_ID, TW_CORRECTING);
     uart_putc(UART_ID, TW_BACKWARDS);
-    previous_correcting = correcting;
-  } else if (!correcting && previous_correcting) {
+    previous_direction = new_direction;
+  } else if (new_direction == WRITING && previous_direction == CORRECTING) {
+    printf("now writing\n");
     uart_putc(UART_ID, TW_WRITING);
     uart_putc(UART_ID, TW_FORWARDS);
-    previous_correcting = correcting;
+    previous_direction = new_direction;
   }
+}
+
+static void print_char_to_typewriter(uint8_t iso_code) {
   printf("%c\n", iso_code);
 
   uint8_t const table_size = sizeof(iso2erika[iso_code]) / sizeof(iso2erika[iso_code][0]);
@@ -191,7 +204,7 @@ static void print_char_to_typewriter(uint8_t iso_code, bool correcting) {
     uint8_t const ch = iso2erika[iso_code][table_size - i - 1];
     if (ch == 0)
       continue;
-    printf("%s me pls %d", (correcting ? "remove" : "print"), ch);
+    printf("print me pls %d", ch);
     uart_putc(UART_ID, ch);
   }
 }
@@ -205,6 +218,7 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
   static bool caps_lock = false;
   static uint8_t line_buffer[150];
   static uint8_t line_position = 0;
+  static uint8_t line_end = 0;
   bool flush = false;
 
   for (uint8_t i = 0; i < 6; i++)
@@ -223,9 +237,21 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
       }
       else if (keycode == KC_BACKSPACE && line_position > 0)
       {
+        if (line_position == line_end) {
+          --line_end;
+        }
         uint8_t iso = line_buffer[--line_position];
-        print_char_to_typewriter(iso, true);
+        set_direction(CORRECTING);
+        print_char_to_typewriter(iso);
+        line_buffer[line_position] = ' ';
         flush = true;
+      }
+      else if (keycode == KC_ESCAPE) {
+        while (line_position != line_end) {
+          set_direction(WRITING);
+          uart_putc(UART_ID, TW_SPACE);
+          ++line_position;
+        }
       }
       else
       {
@@ -237,13 +263,18 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         
         if (iso)
         {
+          if (line_position == line_end) {
+            ++line_end;
+          }
           line_buffer[line_position++] = iso;
-          print_char_to_typewriter(iso, false);
+          set_direction(WRITING);
+          print_char_to_typewriter(iso);
 
           flush = true;
 
           if (iso == '\n') {
             line_position = 0;
+            line_end = 0;
           }
 
           continue;
@@ -252,8 +283,19 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         uint8_t const special_key = special_keycode2erika[keycode];
         if (special_key)
         {
-          printf("special key: %c\n", special_key);
+          printf("special key: %d\n", special_key);
+          set_direction(WRITING);
           uart_putc(UART_ID, special_key);
+        }
+        if (keycode == KC_LEFT && line_position > 0) {
+          --line_position;
+        } else if (keycode == KC_RIGHT) {
+          if (line_position == line_end) {
+            line_buffer[line_position++] = ' ';
+            ++line_end;
+          } else {
+            ++line_position;
+          }
         }
       }
     }

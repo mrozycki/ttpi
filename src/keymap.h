@@ -218,11 +218,16 @@ static const uint8_t iso2erika[256][4] = {
 #define KC_ESCAPE 0x29
 #define KC_BACKSPACE 0x2a
 #define KC_CAPS_LOCK 0x39
+#define KC_RIGHT 0x4F
+#define KC_LEFT 0x50
+#define KC_DOWN 0x51
+#define KC_UP 0x52
 
 #define TW_WRITING 0x8B
 #define TW_CORRECTING 0x8C
 #define TW_FORWARDS 0x8D
 #define TW_BACKWARDS 0x8E
+#define TW_SPACE 0x71
 
 static const uint8_t special_keycode2erika[128] = {
     [KC_ESCAPE] = 0,    // Escape
@@ -247,11 +252,11 @@ static const uint8_t special_keycode2erika[128] = {
     [0x4b] = 0,         // Page Up
     [0x4c] = 0,         // Delete
     [0x4d] = 0,         // End
-    [0x4e] = 0,         // Pade Down
-    [0x4f] = 0,         // Right
-    [0x50] = 0,         // Left
-    [0x51] = 0,         // Down
-    [0x52] = 0,         // Up
+    [0x4e] = 0,         // Page Down
+    [KC_RIGHT] = 0x71,  // Right
+    [KC_LEFT] = 0x72,   // Left
+    [KC_DOWN] = 0x75,   // Down
+    [KC_UP] = 0x76,     // Up
     [0x53] = 0,         // Num Lock
 };
 
