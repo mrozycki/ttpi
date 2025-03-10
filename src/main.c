@@ -81,7 +81,7 @@ static void set_direction(direction new_direction) {
   }
 }
 
-static bool print_char_to_typewriter(uint8_t iso_code) {
+static bool print_char_to_typewriter(uint8_t iso_code, bool dryrun) {
   printf("%c\n", iso_code);
   bool printed = false;
 
@@ -91,7 +91,8 @@ static bool print_char_to_typewriter(uint8_t iso_code) {
     if (ch == 0)
       continue;
     printf("print me pls %d", ch);
-    uart_putc(UART_ID, ch);
+    if (!dryrun)
+      uart_putc(UART_ID, ch);
     printed = true;
   }
   
@@ -185,7 +186,7 @@ void tud_cdc_rx_cb(uint8_t itf)
   uint32_t count = tud_cdc_read(buf, sizeof(buf));
   set_direction(WRITING);
   for (uint32_t i = 0; i < count; ++i) {
-    print_char_to_typewriter(buf[i]);
+    print_char_to_typewriter(buf[i], false);
   }
 
   // TODO control LED on keyboard of host stack
@@ -263,6 +264,7 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
   static uint8_t line_buffer[150];
   static uint8_t line_position = 0;
   static uint8_t line_end = 0;
+  static uint8_t printing = true;
   bool flush = false;
 
   for (uint8_t i = 0; i < 6; i++)
@@ -286,16 +288,21 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         }
         uint8_t iso = line_buffer[--line_position];
         set_direction(CORRECTING);
-        print_char_to_typewriter(iso);
+        print_char_to_typewriter(iso, false);
         line_buffer[line_position] = ' ';
         flush = true;
       }
-      else if (keycode == KC_ESCAPE) {
+      else if (keycode == KC_ESCAPE) 
+      {
         while (line_position != line_end) {
           set_direction(WRITING);
           uart_putc(UART_ID, TW_SPACE);
           ++line_position;
         }
+      }
+      else if (keycode == KC_F + 12) 
+      {
+        printing = !printing;
       }
       else
       {
@@ -312,7 +319,7 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
           }
           line_buffer[line_position++] = iso;
           set_direction(WRITING);
-          if (print_char_to_typewriter(iso))
+          if (print_char_to_typewriter(iso, !printing))
             print_char_to_tty(iso);
 
           flush = true;

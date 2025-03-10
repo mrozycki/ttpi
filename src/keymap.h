@@ -125,6 +125,8 @@ static const uint8_t iso2erika[256][4] = {
     ['_'] = {1},
     ['('] = {59},
     [')'] = {57},
+    ['['] = {59},
+    [']'] = {57},
     ['='] = {26},
     ['`'] = {14, 113},
     [BACKSPACE] = {}, // This is handled in code
@@ -222,6 +224,7 @@ static const uint8_t iso2erika[256][4] = {
 #define KC_LEFT 0x50
 #define KC_DOWN 0x51
 #define KC_UP 0x52
+#define KC_F 0x39
 
 #define TW_WRITING 0x8B
 #define TW_CORRECTING 0x8C
