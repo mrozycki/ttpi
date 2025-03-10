@@ -60,6 +60,49 @@ static uint8_t prev_leds = 0xFF;
 static uint8_t keybd_dev_addr = 0xFF;
 static uint8_t keybd_instance;
 
+typedef enum {
+  WRITING,
+  CORRECTING  
+} direction;
+
+static void set_direction(direction new_direction) {
+  static direction previous_direction = false;
+
+  if (new_direction == CORRECTING && previous_direction == WRITING) {
+    printf("now correcting\n");
+    uart_putc(UART_ID, TW_CORRECTING);
+    uart_putc(UART_ID, TW_BACKWARDS);
+    previous_direction = new_direction;
+  } else if (new_direction == WRITING && previous_direction == CORRECTING) {
+    printf("now writing\n");
+    uart_putc(UART_ID, TW_WRITING);
+    uart_putc(UART_ID, TW_FORWARDS);
+    previous_direction = new_direction;
+  }
+}
+
+static bool print_char_to_typewriter(uint8_t iso_code) {
+  printf("%c\n", iso_code);
+  bool printed = false;
+
+  uint8_t const table_size = sizeof(iso2erika[iso_code]) / sizeof(iso2erika[iso_code][0]);
+  for (uint8_t i = 0; i < table_size; ++i) {
+    uint8_t const ch = iso2erika[iso_code][table_size - i - 1];
+    if (ch == 0)
+      continue;
+    printf("print me pls %d", ch);
+    uart_putc(UART_ID, ch);
+    printed = true;
+  }
+  
+  return printed;
+}
+
+static void print_char_to_tty(uint8_t iso_code) {
+  tud_cdc_write_char(iso_code);
+  tud_cdc_write_flush();
+}
+
 /*------------- MAIN -------------*/
 
 void hid_app_task(void)
@@ -75,12 +118,25 @@ void hid_app_task(void)
   }
 }
 
+void core1_main() {
+  sleep_ms(10);
+
+  tud_init(0);
+  while (true) {
+    tud_task();
+    tud_cdc_write_flush();
+  }
+}
+
 int main(void)
 {
   // default 125MHz is not appropreate. Sysclock should be multiple of 12MHz.
   set_sys_clock_khz(120000, true);
 
   sleep_ms(10);
+  
+  multicore_reset_core1();
+  multicore_launch_core1(core1_main);
 
   board_init();
   stdio_init_all();
@@ -117,6 +173,26 @@ int main(void)
 }
 
 //--------------------------------------------------------------------+
+// Device CDC
+//--------------------------------------------------------------------+
+
+// Invoked when CDC interface received data from host
+void tud_cdc_rx_cb(uint8_t itf)
+{
+  (void) itf;
+
+  char buf[64];
+  uint32_t count = tud_cdc_read(buf, sizeof(buf));
+  set_direction(WRITING);
+  for (uint32_t i = 0; i < count; ++i) {
+    print_char_to_typewriter(buf[i]);
+  }
+
+  // TODO control LED on keyboard of host stack
+  (void) count;
+}
+
+//--------------------------------------------------------------------+
 // Host HID
 //--------------------------------------------------------------------+
 
@@ -139,16 +215,18 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 
   printf("[%04x:%04x][%u] HID Interface%u, Protocol = %s\r\n", vid, pid, dev_addr, instance, protocol_str[itf_protocol]);
 
-  // Receive report from boot keyboard & mouse only
+  // Receive report from boot keyboard only
   // tuh_hid_report_received_cb() will be invoked when report is available
-  if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD || itf_protocol == HID_ITF_PROTOCOL_MOUSE)
+  if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD)
   {
-    if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
-      keybd_dev_addr = dev_addr;
-      keybd_instance = instance;
-      tuh_hid_set_report(keybd_dev_addr, keybd_instance, 0, HID_REPORT_TYPE_OUTPUT, &leds, sizeof(leds));
-      prev_leds = leds;
-    }
+    // Turn off keyboard LEDs
+    tuh_hid_set_report(dev_addr, instance, 0, HID_REPORT_TYPE_OUTPUT, &leds, sizeof(leds));
+    prev_leds = leds;
+
+    keybd_dev_addr = dev_addr;
+    keybd_instance = instance;
+    uart_putc(UART_ID, 0x91);
+    
     if (!tuh_hid_receive_report(dev_addr, instance))
     {
       printf("Error: cannot request report\r\n");
@@ -159,6 +237,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 // Invoked when device with hid interface is un-mounted
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
+  uart_putc(UART_ID, 0x92);
   printf("[%u] HID Interface%u is unmounted\r\n", dev_addr, instance);
   keybd_dev_addr = 0xFF;
 }
@@ -174,41 +253,6 @@ static inline bool find_key_in_report(hid_keyboard_report_t const *report, uint8
 
   return false;
 }
-
-typedef enum {
-  WRITING,
-  CORRECTING  
-} direction;
-
-static void set_direction(direction new_direction) {
-  static direction previous_direction = false;
-
-  if (new_direction == CORRECTING && previous_direction == WRITING) {
-    printf("now correcting\n");
-    uart_putc(UART_ID, TW_CORRECTING);
-    uart_putc(UART_ID, TW_BACKWARDS);
-    previous_direction = new_direction;
-  } else if (new_direction == WRITING && previous_direction == CORRECTING) {
-    printf("now writing\n");
-    uart_putc(UART_ID, TW_WRITING);
-    uart_putc(UART_ID, TW_FORWARDS);
-    previous_direction = new_direction;
-  }
-}
-
-static void print_char_to_typewriter(uint8_t iso_code) {
-  printf("%c\n", iso_code);
-
-  uint8_t const table_size = sizeof(iso2erika[iso_code]) / sizeof(iso2erika[iso_code][0]);
-  for (uint8_t i = 0; i < table_size; ++i) {
-    uint8_t const ch = iso2erika[iso_code][table_size - i - 1];
-    if (ch == 0)
-      continue;
-    printf("print me pls %d", ch);
-    uart_putc(UART_ID, ch);
-  }
-}
-
 
 // convert hid keycode to ascii and print via usb device CDC (ignore non-printable)
 static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *report)
@@ -268,7 +312,8 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
           }
           line_buffer[line_position++] = iso;
           set_direction(WRITING);
-          print_char_to_typewriter(iso);
+          if (print_char_to_typewriter(iso))
+            print_char_to_tty(iso);
 
           flush = true;
 
@@ -308,18 +353,6 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
   prev_report = *report;
 }
 
-// send mouse report to usb device CDC
-static void process_mouse_report(uint8_t dev_addr, hid_mouse_report_t const *report)
-{
-  //------------- button state  -------------//
-  // uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
-  char l = report->buttons & MOUSE_BUTTON_LEFT ? 'L' : '-';
-  char m = report->buttons & MOUSE_BUTTON_MIDDLE ? 'M' : '-';
-  char r = report->buttons & MOUSE_BUTTON_RIGHT ? 'R' : '-';
-
-  printf("[%u] %c%c%c %d %d %d\r\n", dev_addr, l, m, r, report->x, report->y, report->wheel);
-}
-
 // Invoked when received report from device via interrupt endpoint
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len)
 {
@@ -330,10 +363,6 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
   {
   case HID_ITF_PROTOCOL_KEYBOARD:
     process_kbd_report(dev_addr, (hid_keyboard_report_t const *)report);
-    break;
-
-  case HID_ITF_PROTOCOL_MOUSE:
-    process_mouse_report(dev_addr, (hid_mouse_report_t const *)report);
     break;
 
   default:
