@@ -60,20 +60,25 @@ static uint8_t prev_leds = 0xFF;
 static uint8_t keybd_dev_addr = 0xFF;
 static uint8_t keybd_instance;
 
-typedef enum {
+typedef enum
+{
   WRITING,
-  CORRECTING  
+  CORRECTING
 } direction;
 
-static void set_direction(direction new_direction) {
+static void set_direction(direction new_direction)
+{
   static direction previous_direction = false;
 
-  if (new_direction == CORRECTING && previous_direction == WRITING) {
+  if (new_direction == CORRECTING && previous_direction == WRITING)
+  {
     printf("now correcting\n");
     uart_putc(UART_ID, TW_CORRECTING);
     uart_putc(UART_ID, TW_BACKWARDS);
     previous_direction = new_direction;
-  } else if (new_direction == WRITING && previous_direction == CORRECTING) {
+  }
+  else if (new_direction == WRITING && previous_direction == CORRECTING)
+  {
     printf("now writing\n");
     uart_putc(UART_ID, TW_WRITING);
     uart_putc(UART_ID, TW_FORWARDS);
@@ -81,12 +86,14 @@ static void set_direction(direction new_direction) {
   }
 }
 
-static bool print_char_to_typewriter(uint8_t iso_code, bool dryrun) {
+static bool print_char_to_typewriter(uint8_t iso_code, bool dryrun)
+{
   printf("%c\n", iso_code);
   bool printed = false;
 
   uint8_t const table_size = sizeof(iso2erika[iso_code]) / sizeof(iso2erika[iso_code][0]);
-  for (uint8_t i = 0; i < table_size; ++i) {
+  for (uint8_t i = 0; i < table_size; ++i)
+  {
     uint8_t const ch = iso2erika[iso_code][table_size - i - 1];
     if (ch == 0)
       continue;
@@ -95,11 +102,12 @@ static bool print_char_to_typewriter(uint8_t iso_code, bool dryrun) {
       uart_putc(UART_ID, ch);
     printed = true;
   }
-  
+
   return printed;
 }
 
-static void print_char_to_tty(uint8_t iso_code) {
+static void print_char_to_tty(uint8_t iso_code)
+{
   tud_cdc_write_char(iso_code);
   tud_cdc_write_flush();
 }
@@ -119,11 +127,13 @@ void hid_app_task(void)
   }
 }
 
-void core1_main() {
+void core1_main()
+{
   sleep_ms(10);
 
   tud_init(0);
-  while (true) {
+  while (true)
+  {
     tud_task();
     tud_cdc_write_flush();
   }
@@ -135,7 +145,7 @@ int main(void)
   set_sys_clock_khz(120000, true);
 
   sleep_ms(10);
-  
+
   multicore_reset_core1();
   multicore_launch_core1(core1_main);
 
@@ -180,17 +190,18 @@ int main(void)
 // Invoked when CDC interface received data from host
 void tud_cdc_rx_cb(uint8_t itf)
 {
-  (void) itf;
+  (void)itf;
 
   char buf[64];
   uint32_t count = tud_cdc_read(buf, sizeof(buf));
   set_direction(WRITING);
-  for (uint32_t i = 0; i < count; ++i) {
+  for (uint32_t i = 0; i < count; ++i)
+  {
     print_char_to_typewriter(buf[i], false);
   }
 
   // TODO control LED on keyboard of host stack
-  (void) count;
+  (void)count;
 }
 
 //--------------------------------------------------------------------+
@@ -227,7 +238,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
     keybd_dev_addr = dev_addr;
     keybd_instance = instance;
     uart_putc(UART_ID, 0x91);
-    
+
     if (!tuh_hid_receive_report(dev_addr, instance))
     {
       printf("Error: cannot request report\r\n");
@@ -283,7 +294,8 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
       }
       else if (keycode == KC_BACKSPACE && line_position > 0)
       {
-        if (line_position == line_end) {
+        if (line_position == line_end)
+        {
           --line_end;
         }
         uint8_t iso = line_buffer[--line_position];
@@ -292,15 +304,16 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         line_buffer[line_position] = ' ';
         flush = true;
       }
-      else if (keycode == KC_ESCAPE) 
+      else if (keycode == KC_ESCAPE)
       {
-        while (line_position != line_end) {
+        while (line_position != line_end)
+        {
           set_direction(WRITING);
           uart_putc(UART_ID, TW_SPACE);
           ++line_position;
         }
       }
-      else if (keycode == KC_F + 12) 
+      else if (keycode == KC_F + 12)
       {
         printing = !printing;
       }
@@ -311,10 +324,11 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
         bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT) || (is_alpha && caps_lock);
         bool const is_alt = report->modifier & KEYBOARD_MODIFIER_RIGHTALT;
         uint8_t const iso = keycode2iso[keycode][is_shift + 2 * is_alt];
-        
+
         if (iso)
         {
-          if (line_position == line_end) {
+          if (line_position == line_end)
+          {
             ++line_end;
           }
           line_buffer[line_position++] = iso;
@@ -324,7 +338,8 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
 
           flush = true;
 
-          if (iso == '\n') {
+          if (iso == '\n')
+          {
             line_position = 0;
             line_end = 0;
           }
@@ -339,13 +354,19 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
           set_direction(WRITING);
           uart_putc(UART_ID, special_key);
         }
-        if (keycode == KC_LEFT && line_position > 0) {
+        if (keycode == KC_LEFT && line_position > 0)
+        {
           --line_position;
-        } else if (keycode == KC_RIGHT) {
-          if (line_position == line_end) {
+        }
+        else if (keycode == KC_RIGHT)
+        {
+          if (line_position == line_end)
+          {
             line_buffer[line_position++] = ' ';
             ++line_end;
-          } else {
+          }
+          else
+          {
             ++line_position;
           }
         }
