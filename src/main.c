@@ -96,7 +96,6 @@ static bool print_char_to_typewriter(uint8_t iso_code, bool dryrun)
     uint8_t const ch = iso2erika[iso_code][current_direction == WRITING ? i : (table_size - i - 1)];
     if (ch == 0)
       continue;
-    printf("print me pls %d", ch);
     if (!dryrun)
       uart_putc(UART_ID, ch);
     printed = true;
@@ -191,9 +190,10 @@ void tud_cdc_rx_cb(uint8_t itf)
 {
   (void)itf;
 
-  char buf[64];
+  char buf[CFG_TUD_CDC_EP_BUFSIZE];
   uint32_t count = tud_cdc_read(buf, sizeof(buf));
   set_direction(WRITING);
+  printf("buffer size: %ld\n", count);
   for (uint32_t i = 0; i < count; ++i)
   {
     print_char_to_typewriter(buf[i], false);

@@ -27,7 +27,8 @@
 #define _TUSB_CONFIG_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 //--------------------------------------------------------------------
@@ -78,18 +79,18 @@ extern "C" {
 #define CFG_TUD_CDC 1
 
 // CDC FIFO size of TX and RX
-#define CFG_TUD_CDC_RX_BUFSIZE 256
-#define CFG_TUD_CDC_TX_BUFSIZE 256
+#define CFG_TUD_CDC_RX_BUFSIZE 2048
+#define CFG_TUD_CDC_TX_BUFSIZE 2048
 
 // CDC Endpoint transfer buffer size, more is faster
-#define CFG_TUD_CDC_EP_BUFSIZE 64
+#define CFG_TUD_CDC_EP_BUFSIZE 2048
 
 #if CFG_TUSB_MCU == OPT_MCU_RP2040
 #define CFG_TUH_RPI_PIO_USB 1 // use pio-usb as host controller
 // #define CFG_TUH_MAX3421       1 // use max3421 as host controller
 
 // host roothub port is 1 if using either pio-usb or max3421
-#if (defined(CFG_TUH_RPI_PIO_USB) && CFG_TUH_RPI_PIO_USB) ||                   \
+#if (defined(CFG_TUH_RPI_PIO_USB) && CFG_TUH_RPI_PIO_USB) || \
     (defined(CFG_TUH_MAX3421) && CFG_TUH_MAX3421)
 #define BOARD_TUH_RHPORT 1
 #endif
@@ -119,16 +120,16 @@ extern "C" {
 
 #define CFG_TUH_HUB 1 // number of supported hubs
 #define CFG_TUH_CDC 1 // CDC ACM
-#define CFG_TUH_CDC_FTDI                                                       \
+#define CFG_TUH_CDC_FTDI \
   1 // FTDI Serial.  FTDI is not part of CDC class, only to re-use CDC driver
     // API
-#define CFG_TUH_CDC_CP210X                                                     \
+#define CFG_TUH_CDC_CP210X \
   1 // CP210x Serial. CP210X is not part of CDC class, only to re-use CDC driver
     // API
-#define CFG_TUH_CDC_CH34X                                                      \
+#define CFG_TUH_CDC_CH34X \
   1 // CH340 or CH341 Serial. CH34X is not part of CDC class, only to re-use CDC
     // driver API
-#define CFG_TUH_HID                                                            \
+#define CFG_TUH_HID \
   (3 * CFG_TUH_DEVICE_MAX) // typical keyboard + mouse device can have 3-4 HID
                            // interfaces
 #define CFG_TUH_MSC 1
@@ -149,7 +150,7 @@ extern "C" {
 
 // Set Line Coding on enumeration/mounted, value for cdc_line_coding_t
 // bit rate = 115200, 1 stop bit, no parity, 8 bit data width
-#define CFG_TUH_CDC_LINE_CODING_ON_ENUM                                        \
+#define CFG_TUH_CDC_LINE_CODING_ON_ENUM \
   {115200, CDC_LINE_CODING_STOP_BITS_1, CDC_LINE_CODING_PARITY_NONE, 8}
 
 #ifdef __cplusplus
