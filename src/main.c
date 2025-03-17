@@ -65,24 +65,23 @@ typedef enum
   WRITING,
   CORRECTING
 } direction;
+static direction current_direction = WRITING;
 
 static void set_direction(direction new_direction)
 {
-  static direction previous_direction = false;
-
-  if (new_direction == CORRECTING && previous_direction == WRITING)
+  if (new_direction == CORRECTING && current_direction == WRITING)
   {
     printf("now correcting\n");
     uart_putc(UART_ID, TW_CORRECTING);
     uart_putc(UART_ID, TW_BACKWARDS);
-    previous_direction = new_direction;
+    current_direction = new_direction;
   }
-  else if (new_direction == WRITING && previous_direction == CORRECTING)
+  else if (new_direction == WRITING && current_direction == CORRECTING)
   {
     printf("now writing\n");
     uart_putc(UART_ID, TW_WRITING);
     uart_putc(UART_ID, TW_FORWARDS);
-    previous_direction = new_direction;
+    current_direction = new_direction;
   }
 }
 
@@ -94,7 +93,7 @@ static bool print_char_to_typewriter(uint8_t iso_code, bool dryrun)
   uint8_t const table_size = sizeof(iso2erika[iso_code]) / sizeof(iso2erika[iso_code][0]);
   for (uint8_t i = 0; i < table_size; ++i)
   {
-    uint8_t const ch = iso2erika[iso_code][table_size - i - 1];
+    uint8_t const ch = iso2erika[iso_code][current_direction == WRITING ? i : (table_size - i - 1)];
     if (ch == 0)
       continue;
     printf("print me pls %d", ch);
