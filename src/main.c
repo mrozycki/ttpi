@@ -196,7 +196,35 @@ void tud_cdc_rx_cb(uint8_t itf)
   printf("buffer size: %ld\n", count);
   for (uint32_t i = 0; i < count; ++i)
   {
-    print_char_to_typewriter(buf[i], false);
+    if (buf[i] != 0x1B) //ESC
+    {
+      print_char_to_typewriter(buf[i], false);
+    } else {
+      ++i;
+      if (i < count)
+      {
+        if (buf[i] == 0x9B) { // CSI
+          ++i;
+          for (; i < count; ++i)
+          {
+            if (buf[i] >= 0x40 && buf[i] <= 0x7E) // CSI end
+            {
+              break;
+            }
+          }
+
+          if (i >= count) {
+            // buffer ended in the middle of escape seq?
+          }
+        } else {
+          //other escapes?
+        }
+      } else {
+        // buffer ended in the middle of escape seq?
+        return;
+      }
+    }
+    
   }
 
   // TODO control LED on keyboard of host stack
@@ -285,6 +313,14 @@ static void process_kbd_report(uint8_t dev_addr, hid_keyboard_report_t const *re
       if (find_key_in_report(&prev_report, keycode))
       {
         // exist in previous report means the current key is holding
+      }
+      else if (keycode == KC_C && report->modifier == KEYBOARD_MODIFIER_LEFTCTRL) 
+      {
+        print_char_to_tty(ETX);
+      }
+      else if (keycode == KC_D && report->modifier == KEYBOARD_MODIFIER_LEFTCTRL) 
+      {
+        print_char_to_tty(EOT);
       }
       else if (keycode == KC_CAPS_LOCK)
       {

@@ -26,8 +26,12 @@
 #define SECTION_SIGN 0xA7
 #define DEGREE_SIGN 0xB0
 #define BACKSPACE 0x08
+#define ETX 0x03
+#define EOT 0x04
 
 #define KC_A 0x04
+#define KC_C 0x06
+#define KC_D 0x07
 #define KC_Z 0x1d
 
 static uint8_t const keycode2iso[128][4] = {
